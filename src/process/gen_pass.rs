@@ -47,6 +47,6 @@ pub fn process_gen_pass(
 
     // 打印密码强度
     let estimate = zxcvbn(&password, &[]);
-    println!("score: {}", estimate.score());
+    eprintln!("score: {}", estimate.score());
     Ok(password)
 }
