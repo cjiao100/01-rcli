@@ -5,11 +5,11 @@ use std::{
 };
 
 // super 表示当前模块的父模块
-use super::verify_input_file;
+use super::verify_file;
 
 #[derive(Debug, Parser)]
 pub struct CsvOpts {
-    #[arg(short, long, help = "Input CSV file path", value_parser = verify_input_file)]
+    #[arg(short, long, help = "Input CSV file path", value_parser = verify_file)]
     pub input: String,
 
     // "output.json".into() 会将字符串转换为String类型

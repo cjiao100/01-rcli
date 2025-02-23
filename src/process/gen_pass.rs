@@ -1,5 +1,4 @@
-use rand::seq::{IndexedRandom, SliceRandom};
-use zxcvbn::zxcvbn;
+use rand::seq::SliceRandom;
 
 const UPPER: &[u8] = b"ABCDEFGHJKLMNPQRSTUVWXYZ";
 const LOWER: &[u8] = b"abcdefghijkmnopqrstuvwxyz";
@@ -14,7 +13,7 @@ pub fn process_gen_pass(
     symbol: bool,
 ) -> anyhow::Result<String> {
     let mut password = Vec::new();
-    let mut rng = rand::rng();
+    let mut rng = rand::thread_rng();
     let mut chars = Vec::new();
 
     if upper {
@@ -45,8 +44,5 @@ pub fn process_gen_pass(
 
     let password = String::from_utf8(password)?;
 
-    // 打印密码强度
-    let estimate = zxcvbn(&password, &[]);
-    eprintln!("score: {}", estimate.score());
     Ok(password)
 }
