@@ -10,6 +10,10 @@ pub enum TextSubCommand {
     Verify(TextVerifyOpts),
     #[command(about = "Generate a new key")]
     Generate(TextKeyGenerateOpts),
+    #[command(about = "Encrypt a message")]
+    Encrypt(TextEncryptOpts),
+    #[command(about = "Decrypt a message")]
+    Decrypt(TextDecryptOpts),
 }
 
 #[derive(Debug, Parser)]
@@ -42,10 +46,31 @@ pub struct TextKeyGenerateOpts {
     pub output: PathBuf,
 }
 
+#[derive(Debug, Parser)]
+pub struct TextEncryptOpts {
+    // #[arg(short, long, value_parser=verify_file, default_value = "-")]
+    // pub input: String,
+    #[arg(short, long, value_parser=verify_file)]
+    pub key: String,
+    #[arg(short, long, value_parser=verify_file)]
+    pub nonce: String,
+}
+
+#[derive(Debug, Parser)]
+pub struct TextDecryptOpts {
+    // #[arg(short, long, value_parser=verify_file, default_value = "-")]
+    // pub input: String,
+    #[arg(short, long, value_parser=verify_file)]
+    pub key: String,
+    #[arg(short, long, value_parser=verify_file)]
+    pub nonce: String,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum TextSignFormat {
     Blake3,
     Ed25519,
+    ChaChaPoly,
 }
 
 impl From<TextSignFormat> for &'static str {
@@ -53,6 +78,7 @@ impl From<TextSignFormat> for &'static str {
         match format {
             TextSignFormat::Blake3 => "black3",
             TextSignFormat::Ed25519 => "ed25519",
+            TextSignFormat::ChaChaPoly => "chacha_poly",
         }
     }
 }
@@ -64,6 +90,7 @@ impl FromStr for TextSignFormat {
         match s.to_lowercase().as_str() {
             "black3" => Ok(TextSignFormat::Blake3),
             "ed25519" => Ok(TextSignFormat::Ed25519),
+            "chacha_poly" => Ok(TextSignFormat::ChaChaPoly),
             _ => Err(anyhow::anyhow!("Invalid Text Sign format")),
         }
     }
@@ -74,6 +101,7 @@ impl fmt::Display for TextSignFormat {
         match self {
             TextSignFormat::Blake3 => write!(f, "black3"),
             TextSignFormat::Ed25519 => write!(f, "ed25519"),
+            TextSignFormat::ChaChaPoly => write!(f, "chacha_poly"),
         }
     }
 }

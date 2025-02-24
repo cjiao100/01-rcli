@@ -2,9 +2,9 @@ use std::fs;
 
 use clap::Parser;
 use rcli::{
-    process_csv, process_decode, process_encode, process_gen_pass, process_text_generate,
-    process_text_sign, process_text_verify, Base64SubCommand, Opts, SubCommand, TextSignFormat,
-    TextSubCommand,
+    process_csv, process_decode, process_encode, process_gen_pass, process_text_decrypt,
+    process_text_encrypt, process_text_generate, process_text_sign, process_text_verify,
+    Base64SubCommand, Opts, SubCommand, TextSignFormat, TextSubCommand,
 };
 use zxcvbn::zxcvbn;
 
@@ -76,7 +76,23 @@ fn main() -> anyhow::Result<()> {
                         fs::write(name.join("ed25519_signer.txt"), &key[0])?;
                         fs::write(name.join("ed25519_verifier.txt"), &key[1])?;
                     }
+                    TextSignFormat::ChaChaPoly => {
+                        // 保存到文件
+                        let name = &opts.output;
+                        fs::write(name.join("chachaPoly.key"), &key[0])?;
+                        fs::write(name.join("chachaPoly.nonce"), &key[1])?;
+                    }
                 }
+            }
+            TextSubCommand::Encrypt(opts) => {
+                let encrypted = process_text_encrypt(&opts.key, &opts.nonce)?;
+
+                println!("{}", encrypted);
+            }
+            TextSubCommand::Decrypt(opts) => {
+                let decrypted = process_text_decrypt(&opts.key, &opts.nonce)?;
+
+                println!("{}", decrypted);
             }
         },
     }
