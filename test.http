@@ -1,0 +1,2 @@
+### text index
+GET http://localhost:8080/fixtures/blake3.txt

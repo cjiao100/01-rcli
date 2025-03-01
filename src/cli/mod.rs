@@ -1,6 +1,7 @@
 mod base64_opts;
 mod csv_opts;
 mod gen_pass_opts;
+mod http_opts;
 mod text_opts;
 
 use clap::Parser;
@@ -9,6 +10,7 @@ use std::path::{Path, PathBuf};
 pub use base64_opts::Base64SubCommand;
 use csv_opts::CsvOpts;
 use gen_pass_opts::GenPassOpts;
+pub use http_opts::HTTPSubCommand;
 pub use text_opts::TextSubCommand;
 
 // pub use self::csv_opts::OutputFormat; 等价写法
@@ -33,6 +35,8 @@ pub enum SubCommand {
     Base64(Base64SubCommand),
     #[command(subcommand)]
     Text(TextSubCommand),
+    #[command(subcommand)]
+    Http(HTTPSubCommand),
 }
 
 fn verify_file(filename: &str) -> Result<String, &'static str> {
