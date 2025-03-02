@@ -4,6 +4,8 @@ use std::{
     str::FromStr,
 };
 
+use crate::CmdExecutor;
+
 // super 表示当前模块的父模块
 use super::verify_file;
 
@@ -28,6 +30,17 @@ pub struct CsvOpts {
 
     #[arg(long, help = "CSV file has header", default_value_t = true)]
     pub header: bool,
+}
+
+impl CmdExecutor for CsvOpts {
+    async fn execute(self) -> anyhow::Result<()> {
+        let output = if let Some(output) = self.output.clone() {
+            output
+        } else {
+            format!("output.{}", self.format)
+        };
+        crate::process_csv(&self.input, output, self.format)
+    }
 }
 
 #[derive(Debug, Clone, Copy)]

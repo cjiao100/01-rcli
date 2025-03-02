@@ -1,6 +1,9 @@
+use crate::CmdExecutor;
+
 use super::{verify_file, verify_path};
 use clap::Parser;
 use std::{fmt, path::PathBuf, str::FromStr};
+use tokio::fs;
 
 #[derive(Debug, Parser)]
 pub enum TextSubCommand {
@@ -108,4 +111,79 @@ impl fmt::Display for TextSignFormat {
 
 fn parse_format(format: &str) -> Result<TextSignFormat, anyhow::Error> {
     format.parse()
+}
+
+impl CmdExecutor for TextSignOpts {
+    async fn execute(self) -> anyhow::Result<()> {
+        crate::process_text_sign(&self.input, &self.key, self.format)?;
+
+        Ok(())
+    }
+}
+
+impl CmdExecutor for TextVerifyOpts {
+    async fn execute(self) -> anyhow::Result<()> {
+        crate::process_text_verify(&self.input, &self.key, self.format, &self.sig)?;
+        Ok(())
+    }
+}
+
+impl CmdExecutor for TextKeyGenerateOpts {
+    async fn execute(self) -> anyhow::Result<()> {
+        let key = crate::process_text_generate(self.format)?;
+
+        match self.format {
+            TextSignFormat::Blake3 => {
+                // 保存到文件
+                let name = self.output.join("blake3.txt");
+                fs::write(name, &key[0]).await?;
+            }
+            TextSignFormat::Ed25519 => {
+                // 保存到文件
+                let name = self.output.join("ed25519.txt");
+                fs::write(name, &key[0]).await?;
+
+                let name = self.output.join("ed25519_verifier.txt");
+                fs::write(name.join("ed25519_verifier.txt"), &key[1]).await?;
+            }
+            TextSignFormat::ChaChaPoly => {
+                // 保存到文件
+                let name = self.output.join("chacha_poly.txt");
+                fs::write(name, &key[0]).await?;
+
+                let name = self.output.join("chacha_poly.nonce");
+                fs::write(name.join("name"), &key[1]).await?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+impl CmdExecutor for TextEncryptOpts {
+    async fn execute(self) -> anyhow::Result<()> {
+        let encrypted = crate::process_text_encrypt(&self.key, &self.nonce)?;
+        println!("{}", encrypted);
+        Ok(())
+    }
+}
+
+impl CmdExecutor for TextDecryptOpts {
+    async fn execute(self) -> anyhow::Result<()> {
+        let decrypted = crate::process_text_decrypt(&self.key, &self.nonce)?;
+        println!("{}", decrypted);
+        Ok(())
+    }
+}
+
+impl CmdExecutor for TextSubCommand {
+    async fn execute(self) -> anyhow::Result<()> {
+        match self {
+            TextSubCommand::Sign(opts) => opts.execute().await,
+            TextSubCommand::Verify(opts) => opts.execute().await,
+            TextSubCommand::Generate(opts) => opts.execute().await,
+            TextSubCommand::Encrypt(opts) => opts.execute().await,
+            TextSubCommand::Decrypt(opts) => opts.execute().await,
+        }
+    }
 }
