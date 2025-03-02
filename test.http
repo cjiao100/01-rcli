@@ -1,6 +1,8 @@
 ### text index page
-GET http://localhost:8080/fixtures/blake3.txt
+GET http://localhost:8080/Cargo.toml
 
+### text index dir page
+GET http://localhost:8080/fixtures/
 
 ### text static file with tower-http
 GET http://localhost:8080/tower/fixtures/

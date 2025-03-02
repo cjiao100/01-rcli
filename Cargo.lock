@@ -1236,6 +1236,7 @@ dependencies = [
  "clap",
  "csv",
  "ed25519-dalek",
+ "mime_guess",
  "rand",
  "serde",
  "serde_json",

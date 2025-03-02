@@ -1,10 +1,12 @@
 use anyhow::Result;
 use axum::{
     extract::{Path, State},
-    http::{Request, StatusCode},
+    http::{header, Request, StatusCode},
+    response::{IntoResponse, Response},
     routing::get,
     serve, Router,
 };
+use mime_guess::from_path;
 use std::{net::SocketAddr, path::PathBuf, sync::Arc};
 use tokio::{fs, net::TcpListener};
 use tower_http::services::ServeDir;
@@ -83,7 +85,7 @@ pub async fn process_http_serve(dir: PathBuf, port: u16) -> Result<()> {
 pub async fn file_handler(
     State(state): State<Arc<HttpServeState>>,
     Path(path): Path<String>,
-) -> (StatusCode, String) {
+) -> Response {
     // 拼接文件路径, Path::new 是一个静态方法，用于创建一个 Path
     // join 是 Path 的一个方法，用于拼接路径
     let p = std::path::Path::new(&state.dir).join(path);
@@ -94,31 +96,127 @@ pub async fn file_handler(
         return (
             StatusCode::NOT_FOUND,
             format!("File not found: {}", p.display()),
-        );
+        )
+            .into_response();
     }
 
-    // 判断是否是文件
-    if !p.is_file() {
-        return (
-            StatusCode::BAD_REQUEST,
-            format!("Not a file: {}", p.display()),
-        );
+    // 判断是否是目录
+    if p.is_dir() {
+        return handle_directory(p).await;
     }
 
-    // 读取文件内容
-    match fs::read_to_string(p).await {
-        Ok(content) => {
-            info!("Read {} bytes", content.len());
-            // 返回文件内容
-            (StatusCode::OK, content)
+    if p.is_file() {
+        let mime_type = from_path(&p).first_or_octet_stream().to_string();
+        let is_likely_binary = !mime_type.starts_with("text/")
+            && !mime_type.contains("json")
+            && !mime_type.contains("xml");
+
+        return if is_likely_binary {
+            handle_binary_file(p, mime_type).await
+        } else {
+            handle_file(p, mime_type).await
+        };
+    }
+
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "Internal server error".to_string(),
+    )
+        .into_response()
+}
+
+pub async fn handle_directory(p: PathBuf) -> Response {
+    info!("Is a directory: {}", p.display());
+    match fs::read_dir(p.clone()).await {
+        Ok(mut entries) => {
+            let mut content = String::from(
+                "<!DOCTYPE html>\n<html>\n<head>\n<title>Directory listing</title>\n\
+                    <style>\n\
+                    body { font-family: system-ui, sans-serif; margin: 2em; }\n\
+                    h1 { border-bottom: 1px solid #eee; }\n\
+                    ul { list-style-type: none; padding: 0; }\n\
+                    li { margin: 0.2em 0; }\n\
+                    a { text-decoration: none; color: #0366d6; }\n\
+                    a:hover { text-decoration: underline; }\n\
+                    </style>\n\
+                    </head>\n<body>\n\
+                    <h1>Directory: ",
+            );
+            content.push_str(&p.display().to_string());
+            content.push_str("</h1>\n<ul>\n");
+
+            while let Ok(Some(entry)) = entries.next_entry().await {
+                let file_name = entry.file_name();
+                let file_name = file_name.to_str().unwrap();
+                let file_path = format!("./{}", file_name);
+                content.push_str(
+                    format!("<li><a href=\"{}\">{}</a></li>\n", file_path, file_name).as_str(),
+                );
+            }
+            content.push_str("</ul></body></html>");
+
+            Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, "text/html")
+                .body(content)
+                .unwrap()
+                .into_response()
         }
         Err(e) => {
-            warn!("Read file error: {:?}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            warn!("Read dir error: {:?}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
         }
     }
 }
 
+pub async fn handle_file(p: PathBuf, mime_type: String) -> Response {
+    info!("Is a file: {}", p.display());
+    // 读取文件内容
+    match fs::read_to_string(p.clone()).await {
+        Ok(content) => {
+            info!("Read {} bytes", content.len());
+            // 为文本文件添加 charset=utf-8
+            let content_type = if mime_type.starts_with("text/") {
+                format!("{}; charset=utf-8", mime_type)
+            } else {
+                mime_type
+            };
+
+            // 返回文件内容
+            Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, content_type)
+                .body(content)
+                .unwrap()
+                .into_response()
+        }
+        Err(e) => {
+            warn!("Read file error: {:?}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
+        }
+    }
+}
+
+pub async fn handle_binary_file(p: PathBuf, mime_type: String) -> Response {
+    match fs::read(p.clone()).await {
+        Ok(bytes) => {
+            info!("Read binary file {} bytes", bytes.len());
+            let body = axum::body::Body::from(bytes);
+
+            Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, mime_type)
+                .header(header::ACCEPT_RANGES, "bytes") // 支持范围请求
+                .body(body)
+                .unwrap()
+                .into_response()
+        }
+        Err(e) => {
+            warn!("Read file error: {:?}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
+        }
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -129,7 +227,13 @@ mod tests {
         });
 
         let path = Path("Cargo.toml".to_string());
-        let (status, content) = file_handler(State(state), path).await;
+        let response = file_handler(State(state), path).await;
+        let response = response.into_response();
+
+        let status = response.status();
+        let body = response.into_body();
+        let bytes = axum::body::to_bytes(body, usize::MAX).await.unwrap();
+        let content = String::from_utf8(bytes.to_vec()).unwrap();
 
         assert_eq!(status, StatusCode::OK);
         assert!(content.trim().starts_with("[package]"));
