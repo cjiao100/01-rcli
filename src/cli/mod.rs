@@ -5,20 +5,10 @@ mod http_opts;
 mod text_opts;
 
 use clap::Parser;
+use enum_dispatch::enum_dispatch;
 use std::path::{Path, PathBuf};
 
-pub use base64_opts::Base64SubCommand;
-use csv_opts::CsvOpts;
-use gen_pass_opts::GenPassOpts;
-pub use http_opts::HTTPSubCommand;
-pub use text_opts::TextSubCommand;
-
-// pub use self::csv_opts::OutputFormat; 等价写法
-pub use base64_opts::Base64Format;
-pub use csv_opts::OutputFormat;
-pub use text_opts::TextSignFormat;
-
-use crate::CmdExecutor;
+pub use self::{base64_opts::*, csv_opts::*, gen_pass_opts::*, http_opts::*, text_opts::*};
 
 #[derive(Debug, Parser)]
 #[command(name = "rcli", version, author, about, long_about = None)]
@@ -28,6 +18,7 @@ pub struct Opts {
 }
 
 #[derive(Debug, Parser)]
+#[enum_dispatch(CmdExecutor)]
 pub enum SubCommand {
     #[command(name = "csv", about = "show CSV , or Convert CSV to other formats")]
     Csv(CsvOpts),
@@ -41,17 +32,17 @@ pub enum SubCommand {
     Http(HTTPSubCommand),
 }
 
-impl CmdExecutor for SubCommand {
-    async fn execute(self) -> anyhow::Result<()> {
-        match self {
-            SubCommand::Csv(opts) => opts.execute().await,
-            SubCommand::GenPass(opts) => opts.execute().await,
-            SubCommand::Base64(cmd) => cmd.execute().await,
-            SubCommand::Text(cmd) => cmd.execute().await,
-            SubCommand::Http(cmd) => cmd.execute().await,
-        }
-    }
-}
+// impl CmdExecutor for SubCommand {
+//     async fn execute(self) -> anyhow::Result<()> {
+//         match self {
+//             SubCommand::Csv(opts) => opts.execute().await,
+//             SubCommand::GenPass(opts) => opts.execute().await,
+//             SubCommand::Base64(cmd) => cmd.execute().await,
+//             SubCommand::Text(cmd) => cmd.execute().await,
+//             SubCommand::Http(cmd) => cmd.execute().await,
+//         }
+//     }
+// }
 
 fn verify_file(filename: &str) -> Result<String, &'static str> {
     // 判断 filename 是否为 "-" 或者文件是否存在
