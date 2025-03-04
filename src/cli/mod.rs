@@ -2,13 +2,16 @@ mod base64_opts;
 mod csv_opts;
 mod gen_pass_opts;
 mod http_opts;
+mod jwt_opts;
 mod text_opts;
 
 use clap::Parser;
 use enum_dispatch::enum_dispatch;
 use std::path::{Path, PathBuf};
 
-pub use self::{base64_opts::*, csv_opts::*, gen_pass_opts::*, http_opts::*, text_opts::*};
+pub use self::{
+    base64_opts::*, csv_opts::*, gen_pass_opts::*, http_opts::*, jwt_opts::*, text_opts::*,
+};
 
 #[derive(Debug, Parser)]
 #[command(name = "rcli", version, author, about, long_about = None)]
@@ -30,6 +33,8 @@ pub enum SubCommand {
     Text(TextSubCommand),
     #[command(subcommand, about = "HTTP serve")]
     Http(HTTPSubCommand),
+    #[command(subcommand, about = "JWT sign/verify")]
+    JWT(JWTSubCommand),
 }
 
 // impl CmdExecutor for SubCommand {

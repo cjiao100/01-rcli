@@ -142,11 +142,11 @@ impl CmdExecutor for TextKeyGenerateOpts {
             }
             TextSignFormat::Ed25519 => {
                 // 保存到文件
-                let name = self.output.join("ed25519.txt");
+                let name = self.output.join("ed25519_signer.txt");
                 fs::write(name, &key[0]).await?;
 
                 let name = self.output.join("ed25519_verifier.txt");
-                fs::write(name.join("ed25519_verifier.txt"), &key[1]).await?;
+                fs::write(name, &key[1]).await?;
             }
             TextSignFormat::ChaChaPoly => {
                 // 保存到文件
